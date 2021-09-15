@@ -229,12 +229,12 @@ static int load_market(redisContext *context, struct market_info *info)
     return 0;
 }
 
-static struct market_info *create_market(const char *market, mpd_t *price = mpd_zero)
+static struct market_info *create_market(const char *market)
 {
     struct market_info *info = malloc(sizeof(struct market_info));
     memset(info, 0, sizeof(struct market_info));
     info->name = strdup(market);
-    info->last = mpd_qncopy(price);
+    info->last = mpd_qncopy(mpd_zero);
     dict_types dt;
 
     memset(&dt, 0, sizeof(dt));
@@ -428,7 +428,7 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
 {
     struct market_info *info = market_query(market);
     if (info == NULL) {
-        info = create_market(market, price);
+        info = create_market(market);
         if (info == NULL) {
             return -__LINE__;
         }
@@ -442,7 +442,7 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
     if (entry) {
         kinfo = entry->val;
     } else {
-        kinfo = kline_info_new(info->last);
+        kinfo = kline_info_new(price);
         if (kinfo == NULL)
             return -__LINE__;
         dict_add(info->sec, &time_sec, kinfo);
@@ -456,7 +456,7 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
     if (entry) {
         kinfo = entry->val;
     } else {
-        kinfo = kline_info_new(info->last);
+        kinfo = kline_info_new(price);
         if (kinfo == NULL)
             return -__LINE__;
         dict_add(info->min, &time_min, kinfo);
@@ -470,7 +470,7 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
     if (entry) {
         kinfo = entry->val;
     } else {
-        kinfo = kline_info_new(info->last);
+        kinfo = kline_info_new(price);
         if (kinfo == NULL)
             return -__LINE__;
         dict_add(info->hour, &time_hour, kinfo);
@@ -484,7 +484,7 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
     if (entry) {
         kinfo = entry->val;
     } else {
-        kinfo = kline_info_new(info->last);
+        kinfo = kline_info_new(price);
         if (kinfo == NULL)
             return -__LINE__;
         dict_add(info->day, &time_day, kinfo);
@@ -779,7 +779,7 @@ static void clear_kline(void)
     while ((entry = dict_next(iter)) != NULL) {
         struct market_info *info = entry->val;
         clear_dict(info->sec, now - settings.sec_max);
-        clear_dict(info->min, now / 60 * 60 - settings.min_max * 60);
+        clear_dict(info->sec, now / 60 * 60 - settings.min_max * 60);
         clear_dict(info->hour, now / 3600 * 3600 - settings.hour_max * 3600);
     }
     dict_release_iterator(iter);
@@ -1326,9 +1326,6 @@ json_t *get_market_kline_month(const char *market, time_t start, time_t end, int
         }
         if (kinfo == NULL) {
             if (klast == NULL) {
-                // fix: no kline data
-                mon_start = mon_next;
-
                 continue;
             }
             kinfo = kline_info_new(klast->close);
@@ -1380,4 +1377,3 @@ mpd_t  *get_market_last_price(const char *market)
 
     return info->last;
 }
-
